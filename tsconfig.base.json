@@ -1,0 +1,22 @@
+{
+    "compilerOptions": {
+        "removeComments": true,
+        "preserveConstEnums": true,
+        "sourceMap": true,
+        "strict": true,
+        "alwaysStrict": true,
+        "noImplicitReturns": true,
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        "moduleResolution": "node",
+        "stripInternal": false,
+        "noEmit": true,
+        "lib": ["esnext"],
+        "target": "esnext",
+        "baseUrl": ".",
+        "types": []
+    },
+    "bazelOptions": {
+        "suppressTsconfigOverrideWarnings": true
+    }
+}

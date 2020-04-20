@@ -1,0 +1,8 @@
+{
+    "extends": "./tsconfig.base.json",
+    "compilerOptions": {
+        "esModuleInterop": true,
+        "types": ["node", "gulp", "rmfr"]
+    },
+    "include": ["./*.ts"]
+}

@@ -1,0 +1,15 @@
+{
+    "extends": "../tsconfig.base.json",
+    "compilerOptions": {
+        "jsx": "react",
+        "noEmit": false,
+        "baseUrl": ".",
+        "target": "es5",
+        "module": "esnext",
+        "importHelpers": true,
+        "lib": ["esnext", "dom"],
+        "types": ["react-router-dom"]
+    },
+    "include": ["*.ts", "*.tsx", "**/*.ts", "**/*.tsx"],
+    "exclude": ["../node_modules/", "../dist/", "../worker/"]
+}
