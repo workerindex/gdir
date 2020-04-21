@@ -1,11 +1,11 @@
-package main
+package core
 
 import (
 	"fmt"
 	"regexp"
 )
 
-func promptYesNo(question string) bool {
+func PromptYesNo(question string) bool {
 	var line string
 	for {
 		fmt.Printf("%s (y/n) ", question)
@@ -18,7 +18,7 @@ func promptYesNo(question string) bool {
 	}
 }
 
-func promptYesNoWithDefault(question string, defaultYes bool) bool {
+func PromptYesNoWithDefault(question string, defaultYes bool) bool {
 	var line string
 	for {
 		fmt.Printf("%s (", question)
