@@ -31,7 +31,8 @@ export type GoogleDriveAccount = GoogleDriveUserAccount | GoogleDriveServiceAcco
 export interface GoogleDriveConfig {
     // secure random string that provides app-level security
     secret: string;
-    accountRotationWindow: number;
+    accountRotation: number;
+    accountCandidates: number;
     accounts: (GoogleDriveAccount | string)[];
     userURL: (user: string) => Promise<string>;
     static: (pathname: string) => Promise<string>;
@@ -232,18 +233,18 @@ export class GoogleDrive {
 
     async pickAccount(): Promise<GoogleDriveAccount> {
         const {
-            config: { secret, accounts, accountRotationWindow },
+            config: { secret, accounts, accountRotation, accountCandidates },
         } = this;
         const candidates: typeof accounts = [];
-        if (accounts.length <= accountRotationWindow) {
+        if (accounts.length <= accountCandidates) {
             candidates.push(...accounts);
         } else {
-            // new seed for every 1 minute
-            const seed = secret + Math.floor(Date.now() / 1000 / 60).toString();
-            // generate a random value from seed for every 1 minute
+            // new seed for every accountRotation seconds
+            const seed = secret + Math.floor(Date.now() / 1000 / accountRotation).toString();
+            // generate a random value from seed
             const rand = new Uint32Array(await crypto.subtle.digest('SHA-256', str2buf(seed)))[0];
-            // use the seeded random value as starting point, select 10 consecutive accounts
-            for (let i = rand % accounts.length, j = 0; j < accountRotationWindow; i = (i + 1) % accounts.length, ++j) {
+            // use the seeded random value as starting point, select accountCandidates consecutive accounts
+            for (let i = rand % accounts.length, j = 0; j < accountCandidates; i = (i + 1) % accounts.length, ++j) {
                 candidates.push(accounts[i]);
             }
         }

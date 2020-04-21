@@ -1,12 +1,15 @@
 import rmfr from 'rmfr';
+import glob from 'glob';
 import sass from 'gulp-sass';
 import * as gulp from 'gulp';
 import { rollup, RollupOptions, OutputOptions } from 'rollup';
 import { series, parallel, watch } from 'gulp';
+import replace from '@rollup/plugin-replace';
 import commonjs from '@rollup/plugin-commonjs';
 import resolve from '@rollup/plugin-node-resolve';
 import typescriptPlugin from '@rollup/plugin-typescript';
 
+const config = require('./config');
 const webserver = require('gulp-webserver');
 
 gulp.task('app.rollup', async () => {
@@ -28,7 +31,7 @@ gulp.task('app.rollup', async () => {
     };
     const output: RollupOptions = {
         output: {
-            file: './dist/app.js',
+            file: './static/app.js',
             format: 'iife',
             sourcemap: true,
             globals: {
@@ -44,15 +47,26 @@ gulp.task('app.rollup', async () => {
 });
 
 gulp.task('app.scss', () =>
-    gulp.src('./app/styles/**/*.scss').pipe(sass().on('error', sass.logError)).pipe(gulp.dest('./dist')),
+    gulp.src('./app/styles/**/*.scss').pipe(sass().on('error', sass.logError)).pipe(gulp.dest('./static')),
 );
 
-gulp.task('app.static', () => gulp.src(['./app/**/*.html', './app/favicon.ico']).pipe(gulp.dest('./dist')));
+gulp.task('app.static', () => gulp.src(['./app/**/*.html', './app/favicon.ico']).pipe(gulp.dest('./static')));
 
 gulp.task('worker.rollup', async () => {
     const input: RollupOptions = {
         input: './worker/index.ts',
         plugins: [
+            replace({
+                __SECRET__: config.secret_key,
+                'length: 1000': `length: ${config.accounts_count}`,
+                'accountRotation: 60': `accountRotation: ${config.account_rotation}`,
+                'accountCandidates: 10': `accountCandidates: ${config.account_candidates}`,
+                __GIST_USER__: config.gist_user,
+                __GISTHASH_FOR_ACCOUNTS__: config.gist_id.accounts,
+                __GISTHASH_FOR_USERS__: config.gist_id.users,
+                __GISTHASH_FOR_STATIC__: config.gist_id.static,
+                include: './worker/config.ts',
+            }),
             resolve({
                 extensions: ['.js', '.ts'],
             }),
@@ -75,7 +89,7 @@ gulp.task('worker.rollup', async () => {
     await bundle.write(output);
 });
 
-gulp.task('clean', async () => rmfr('./dist'));
+gulp.task('clean', async () => Promise.all([rmfr('./dist/*.*', { glob: {} }), rmfr('./static/*.*', { glob: {} })]));
 
 gulp.task('default', series('clean', 'app.rollup', 'app.scss', 'app.static', 'worker.rollup'));
 
@@ -91,7 +105,7 @@ gulp.task(
     series(
         'default',
         parallel('watch', () =>
-            gulp.src('./dist').pipe(
+            gulp.src('./static').pipe(
                 webserver({
                     port: '8000',
                     host: '127.0.0.1',

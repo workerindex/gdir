@@ -10,16 +10,18 @@ import (
 	"flag"
 	"fmt"
 	"hash"
+	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
 var args = struct {
-	Key             string
-	User            user
-	DrivesWhiteList string
-	DrivesBlackList string
+	Key             string `json:"secret_key,omitempty"`
+	User            user   `json:"-"`
+	DrivesWhiteList string `json:"-"`
+	DrivesBlackList string `json:"-"`
 }{}
 
 type user struct {
@@ -30,7 +32,6 @@ type user struct {
 }
 
 func init() {
-	flag.StringVar(&args.Key, "key", "", "encryption key")
 	flag.StringVar(&args.User.Name, "user", "", "username")
 	flag.StringVar(&args.User.Pass, "pass", "", "password")
 	flag.StringVar(&args.DrivesWhiteList, "drive-white-list", "", "comma separated list of drive IDs")
@@ -42,12 +43,19 @@ func run() (err error) {
 	var hash hash.Hash
 	var block cipher.Block
 	var aead cipher.AEAD
-	var iv []byte
+	var inBytes []byte
 	var outBytes []byte
-	var outPath string
-	var outFile *os.File
+	var outName string
 
 	flag.Parse()
+
+	if inBytes, err = ioutil.ReadFile("config.json"); err != nil {
+		return
+	}
+
+	if err = json.Unmarshal(inBytes, &args); err != nil {
+		return
+	}
 
 	if args.Key == "" || args.User.Name == "" || args.User.Pass == "" {
 		flag.Usage()
@@ -61,7 +69,7 @@ func run() (err error) {
 	hash = sha256.New()
 	hash.Write([]byte(args.Key))
 	hash.Write([]byte(args.User.Name))
-	outPath = hex.EncodeToString(hash.Sum(nil))
+	outName = hex.EncodeToString(hash.Sum(nil))
 
 	block, err = aes.NewCipher(key)
 	if err != nil {
@@ -77,8 +85,13 @@ func run() (err error) {
 		err = fmt.Errorf("nonce size expect to be 12 by actually is %d", aead.NonceSize())
 	}
 
-	iv = make([]byte, 12)
-	rand.Read(iv)
+	inBytes, err = json.Marshal(args.User)
+	if err != nil {
+		return
+	}
+
+	outBytes = make([]byte, 12, 12+len(outBytes)+aead.Overhead())
+	rand.Read(outBytes[:12])
 
 	if args.DrivesWhiteList != "" {
 		args.User.DrivesWhiteList = strings.Split(args.DrivesWhiteList, ",")
@@ -88,28 +101,8 @@ func run() (err error) {
 		args.User.DrivesBlackList = strings.Split(args.DrivesBlackList, ",")
 	}
 
-	outBytes, err = json.Marshal(args.User)
-	if err != nil {
-		return
-	}
-
-	outBytes = aead.Seal(nil, iv, outBytes, nil)
-
-	outFile, err = os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
-	_, err = outFile.Write(iv)
-	if err != nil {
-		return
-	}
-	_, err = outFile.Write(outBytes)
-	if err != nil {
-		return
-	}
-	err = outFile.Close()
-	if err != nil {
-		return
-	}
-
-	return
+	outBytes = aead.Seal(outBytes, outBytes[:12], inBytes, nil)
+	return ioutil.WriteFile(filepath.Join("users", outName), outBytes, 0600)
 }
 
 func main() {

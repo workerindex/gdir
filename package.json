@@ -23,6 +23,7 @@
         "@types/react-router-dom": "^5.1.4",
         "@types/rmfr": "^2.0.0",
         "@types/service-worker-mock": "^2.0.1",
+        "glob": "^7.1.6",
         "gulp": "^4.0.2",
         "gulp-sass": "^4.0.2",
         "gulp-webserver": "^0.9.1",
