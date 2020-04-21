@@ -38,20 +38,15 @@ Then follow the instructions to setup and deploy your gdir instance.
 
 **Note:** Windows users may or may not experience with random failures during `npm install`. Typically with failure messages like `Error: PERM: operation not permitted`. This is usually your antivirus is reading some files while npm is trying to remove them. Try turning off your antivirus, remove the `node_modules` folder and try again.
 
-## Add Users
+## Add / Edit Users
 
-To add more users, run the following commands:
+To add more users, run the following command:
 
 ```
-go run ./tools/adduser --user <USERNAME> --pass <PASSWORD>
+go run ./tools/adduser
 ```
 
-There are some extra options you can use:
-
--   `--drive-white-list`: a comma separated list of Google Team Drive IDs that the user is only allowed to access.
--   `--drive-black-list`: a comma separated list of Google Team Drive IDs that the user is not allowed to access.
-
-A user without specifying white list nor black list is considered having access to all Team Drives that the underlying Google accounts have access to. Usually you want to add your accounts to all Team Drives, and then create normal users with access control.
+Then follow the instructions to add, edit, and deploy users.
 
 ## Say Hi
 
