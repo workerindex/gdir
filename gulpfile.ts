@@ -1,3 +1,4 @@
+import fs from 'fs';
 import rmfr from 'rmfr';
 import glob from 'glob';
 import sass from 'gulp-sass';
@@ -11,6 +12,18 @@ import typescriptPlugin from '@rollup/plugin-typescript';
 
 const config = require('./config');
 const webserver = require('gulp-webserver');
+const Cloudworker = require('@dollarshaveclub/cloudworker');
+
+const workerServerConfig = {
+    port: 3000,
+    host: '127.0.0.1',
+    debug: true,
+};
+
+const staticServerConfig = {
+    port: 3005,
+    host: '127.0.0.1',
+};
 
 gulp.task('app.rollup', async () => {
     const input: RollupOptions = {
@@ -53,6 +66,15 @@ gulp.task('app.scss', () =>
 gulp.task('app.static', () => gulp.src(['./app/**/*.html', './app/favicon.ico']).pipe(gulp.dest('./static')));
 
 gulp.task('worker.rollup', async () => {
+    if (!config.accountsURL) {
+        config.accountsURL = `https://gist.githubusercontent.com/${config.gist_user}/${config.gist_id.accounts}/raw/`;
+    }
+    if (!config.usersURL) {
+        config.usersURL = `https://gist.githubusercontent.com/${config.gist_user}/${config.gist_id.users}/raw/`;
+    }
+    if (!config.staticURL) {
+        config.staticURL = `https://gist.githubusercontent.com/${config.gist_user}/${config.gist_id.static}/raw`;
+    }
     const input: RollupOptions = {
         input: './worker/index.ts',
         plugins: [
@@ -61,10 +83,9 @@ gulp.task('worker.rollup', async () => {
                 'length: 1000': `length: ${config.accounts_count}`,
                 'accountRotation: 60': `accountRotation: ${config.account_rotation}`,
                 'accountCandidates: 10': `accountCandidates: ${config.account_candidates}`,
-                __GIST_USER__: config.gist_user,
-                __GISTHASH_FOR_ACCOUNTS__: config.gist_id.accounts,
-                __GISTHASH_FOR_USERS__: config.gist_id.users,
-                __GISTHASH_FOR_STATIC__: config.gist_id.static,
+                __ACCOUNTS_URL__: config.accountsURL,
+                __USERS_URL__: config.usersURL,
+                __STATIC_URL__: config.staticURL,
                 include: './worker/config.ts',
             }),
             resolve({
@@ -97,22 +118,46 @@ gulp.task('watch', () => {
     watch(['./app/**/*.ts', './app/**/*.tsx'], series('app.rollup'));
     watch('./app/**/*.scss', series('app.scss'));
     watch(['./app/**/*.html', './app/favicon.ico'], parallel('app.static', 'worker.rollup'));
-    watch('./worker/**/*.ts', series('worker.rollup'));
 });
 
 gulp.task(
     'serve',
     series(
+        async () => {
+            config.accountsURL = `http://${staticServerConfig.host}:${staticServerConfig.port}/`;
+            config.usersURL = `http://${staticServerConfig.host}:${staticServerConfig.port}/`;
+            config.staticURL = `http://${staticServerConfig.host}:${staticServerConfig.port}`;
+        },
         'default',
-        parallel('watch', () =>
-            gulp.src('./static').pipe(
-                webserver({
-                    port: '8000',
-                    host: '127.0.0.1',
-                    livereload: true,
-                    fallback: 'index.html',
-                }),
-            ),
+        parallel(
+            'watch',
+            async () => {
+                const { port, host, debug } = workerServerConfig;
+                let server: any = null;
+                let reloading = false;
+                const startServer = async () => {
+                    if (server) {
+                        if (!reloading) {
+                            reloading = true;
+                            console.log('\nReloading Worker Server...\n');
+                            server.close(async () => {
+                                server = null;
+                                await startServer();
+                                console.log('\nReloading Worker Server Success!\n');
+                                reloading = false;
+                            });
+                        }
+                        return;
+                    }
+                    server = new Cloudworker(fs.readFileSync('./dist/worker.js', 'utf-8'), {
+                        debug,
+                    }).listen(port, host);
+                };
+                await startServer();
+                console.log('\n' + `Local Worker is live at: http://${host}:${port}/` + '\n');
+                watch('./worker/**/*.ts', series('worker.rollup', startServer));
+            },
+            () => gulp.src(['./accounts', './users', './static']).pipe(webserver(staticServerConfig)),
         ),
     ),
 );
