@@ -48,6 +48,7 @@ gulp.task('app.rollup', async () => {
             format: 'iife',
             sourcemap: true,
             globals: {
+                rxjs: 'rxjs',
                 react: 'React',
                 'react-dom': 'ReactDOM',
                 'react-router-dom': 'ReactRouterDOM',

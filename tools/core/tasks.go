@@ -596,7 +596,7 @@ func ConfigureUserAccessList(targetListName string, targetList *[]string, counte
 	fmt.Println("    (6) Disable access control on the user")
 	fmt.Printf("Please enter your choice: ")
 	fmt.Scanln(&line)
-	if line == "1" {
+	if line == "1" || line == "" {
 		confirmed = true
 	} else if line == "2" {
 		fmt.Println("(Use comma to separate between drive IDs.)")
