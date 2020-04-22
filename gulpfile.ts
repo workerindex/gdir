@@ -11,8 +11,6 @@ import resolve from '@rollup/plugin-node-resolve';
 import typescriptPlugin from '@rollup/plugin-typescript';
 
 const config = require('./config');
-const webserver = require('gulp-webserver');
-const Cloudworker = require('@dollarshaveclub/cloudworker');
 
 const workerServerConfig = {
     port: 3000,
@@ -133,6 +131,7 @@ gulp.task(
         parallel(
             'watch',
             async () => {
+                const Cloudworker = require('@dollarshaveclub/cloudworker');
                 const { port, host, debug } = workerServerConfig;
                 let server: any = null;
                 let reloading = false;
@@ -160,7 +159,10 @@ gulp.task(
                 );
                 watch('./worker/**/*.ts', series('worker.rollup', startServer));
             },
-            () => gulp.src(['./accounts', './users', './static']).pipe(webserver(staticServerConfig)),
+            async () => {
+                const webserver = require('gulp-webserver');
+                return gulp.src(['./accounts', './users', './static']).pipe(webserver(staticServerConfig));
+            },
         ),
     ),
 );

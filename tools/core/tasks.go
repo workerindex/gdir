@@ -696,7 +696,7 @@ func NpmInstall() (err error) {
 		}
 	}
 	if _, err = os.Stat("node_modules"); os.IsNotExist(err) {
-		cmd := exec.Command("npm", "install")
+		cmd := exec.Command("npm", "install", "--production")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		err = cmd.Run()
