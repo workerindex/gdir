@@ -16,7 +16,7 @@ const Cloudworker = require('@dollarshaveclub/cloudworker');
 
 const workerServerConfig = {
     port: 3000,
-    host: '127.0.0.1',
+    host: '0.0.0.0',
     debug: true,
 };
 
@@ -154,7 +154,9 @@ gulp.task(
                     }).listen(port, host);
                 };
                 await startServer();
-                console.log('\n' + `Local Worker is live at: http://${host}:${port}/` + '\n');
+                console.log(
+                    '\n' + `Local Worker is live at: http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}/` + '\n',
+                );
                 watch('./worker/**/*.ts', series('worker.rollup', startServer));
             },
             () => gulp.src(['./accounts', './users', './static']).pipe(webserver(staticServerConfig)),
