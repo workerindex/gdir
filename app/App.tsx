@@ -2,7 +2,7 @@ import * as React from 'react';
 import { BrowserRouter, Switch, Route } from 'react-router-dom';
 
 import { getCookies } from './utils';
-import FileList from './FileList';
+import { FileList } from './FileList';
 import { LoginForm } from './LoginForm';
 
 const Home = () => {
@@ -21,7 +21,7 @@ export default class App extends React.Component {
                 <Route exact path="/">
                     <Home />
                 </Route>
-                <Route path="/folder/:parent">
+                <Route path="/folder/:folderID">
                     <FileList />
                 </Route>
             </Switch>

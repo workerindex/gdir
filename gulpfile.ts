@@ -26,7 +26,7 @@ const staticServerConfig = {
 gulp.task('app.rollup', async () => {
     const input: RollupOptions = {
         input: './app/index.tsx',
-        external: ['react', 'react-dom', 'react-router-dom'],
+        external: ['react', 'react-dom', 'react-router-dom', 'rxjs', 'rxjs/ajax', 'rxjs/operators'],
         plugins: [
             resolve({
                 extensions: ['.js', '.ts', '.tsx'],
@@ -46,10 +46,12 @@ gulp.task('app.rollup', async () => {
             format: 'iife',
             sourcemap: true,
             globals: {
-                rxjs: 'rxjs',
                 react: 'React',
                 'react-dom': 'ReactDOM',
                 'react-router-dom': 'ReactRouterDOM',
+                rxjs: 'rxjs',
+                'rxjs/ajax': 'rxjs.ajax',
+                'rxjs/operators': 'rxjs.operators',
             },
         },
     };

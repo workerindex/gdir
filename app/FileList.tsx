@@ -1,10 +1,13 @@
 import * as React from 'react';
-import { Link, withRouter, RouteComponentProps } from 'react-router-dom';
+import { Subject, BehaviorSubject } from 'rxjs';
+import { ajax } from 'rxjs/ajax';
+import { switchMap, tap, concatMap, map } from 'rxjs/operators';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { getCookies, iconFromMIME } from 'utils';
 import * as H from 'history';
 
 export interface FileListProps {
-    parent?: string;
+    folderID?: string;
 }
 
 interface DriveData {
@@ -31,11 +34,6 @@ interface FileListData {
     nextPageToken?: string;
     files: FileData[];
     drives: DriveData[];
-}
-
-interface FileListState extends FileListData {
-    loading: boolean;
-    parent?: FileData;
 }
 
 interface FileOrderInfo {
@@ -106,249 +104,258 @@ const DefaultOrderChoice: FileOrderChoice = {
     descending: true,
 };
 
-class FileList extends React.Component<RouteComponentProps<FileListProps>, FileListState> {
-    constructor(public props: RouteComponentProps<FileListProps>) {
-        super(props);
-        this.state = this.emptyState();
-    }
-
-    private emptyState(): FileListState {
-        return {
-            files: [],
-            drives: [],
-            loading: false,
-        };
-    }
-
-    private get orderBy(): FileOrderChoice {
-        const { query } = this;
-        const field = query.get('orderBy') || '';
-        const desc = query.get('desc');
-        if (!query.has('orderBy') || field === '') {
-            return DefaultOrderChoice;
-        }
-        return {
-            field,
-            descending: desc === 'true',
-        };
-    }
-
-    private get params(): FileListProps {
-        return this.props.match.params;
-    }
-
-    private get query(): URLSearchParams {
-        return new URLSearchParams(this.props.location.search);
-    }
-
-    componentDidMount() {
-        this.fetchFolder(this.state);
-    }
-
-    componentDidUpdate(prevProps: Readonly<RouteComponentProps<FileListProps>>) {
-        const { params, query } = this;
-        const oldParams = prevProps.match.params;
-        const oldQuery = new URLSearchParams(prevProps.location.search);
-        if (
-            params.parent !== oldParams.parent ||
-            query.get('orderBy') !== oldQuery.get('orderBy') ||
-            query.get('desc') !== oldQuery.get('desc')
-        ) {
-            const state = this.emptyState();
-            this.setState(state);
-            this.fetchFolder(state);
-        }
-    }
-
-    async fetchFolder(state: FileListState): Promise<void> {
-        const { orderBy } = this;
-        const { params } = this.props.match;
-        this.setState({ ...state, loading: true });
-        const url = new URL(`${location.protocol}//${location.host}/api/list`);
-        const defered: Promise<any>[] = [];
-        if (params.parent) {
-            url.searchParams.set('parent', params.parent);
-            defered.push(this.fetchFile(params.parent));
-        }
-        if (state.nextPageToken) {
-            url.searchParams.set('pageToken', state.nextPageToken);
-        }
-        const orderInfo = FileOrderInfos[orderBy.field] as FileOrderInfo;
-        url.searchParams.set('orderBy', orderBy.descending ? orderInfo.descendingQuery : orderInfo.ascendingQuery);
-        defered.push((async () => (await fetch(url.toString())).json())());
-        const results = await Promise.all(defered);
-        let list: FileListData;
-        let parent: FileData | undefined;
-        if (params.parent) {
-            parent = results[0];
-            list = results[1];
-        } else {
-            list = results[0];
-        }
-        this.setState({
-            loading: false,
-            nextPageToken: list.nextPageToken,
-            files: [...state.files, ...(list.files || [])],
-            drives: [...state.drives, ...(list.drives || [])],
-            parent,
-        });
-    }
-
-    async fetchFile(id: string): Promise<FileData> {
-        const url = new URL(`${location.protocol}//${location.host}/api/file`);
-        url.searchParams.set('id', id);
-        return (await fetch(url.toString())).json();
-    }
-
-    private folderLink(parent: string): H.Location {
-        const l = this.props.location;
-        return { ...l, pathname: `/folder/${parent}` };
-    }
-
-    private toOrderBy(orderBy: FileOrderChoice): H.Location {
-        const l = this.props.location;
-        const s = new URLSearchParams(l.search);
-        s.set('orderBy', orderBy.field);
-        if (orderBy.descending) {
-            s.set('desc', 'true');
-        } else {
-            s.delete('desc');
-        }
-        return { ...l, search: s.toString() };
-    }
-
-    private fileLink(file: FileData): string {
-        const cookies = getCookies();
-        return `/file/${file.id}/${encodeURIComponent(file.name)}?t=${cookies['t']}`;
-    }
-
-    render() {
-        const { state, orderBy } = this;
-        const { parent } = state;
-        const orderInfo = FileOrderInfos[orderBy.field] as FileOrderInfo;
-        if (parent) {
-            document.title = parent.name;
-        } else {
-            document.title = 'gd';
-        }
-        return (
-            <div className="file-list">
-                <div className="nav">
-                    <a href="/logout" className="button">
-                        Logout
-                    </a>
-                    <div className="dropdown">
-                        <Link
-                            to={this.toOrderBy({ field: orderBy.field, descending: !orderBy.descending })}
-                            className="dropdown-choice"
-                        >
-                            <i
-                                className={`fas ${
-                                    orderBy.descending ? orderInfo.descendingIcon : orderInfo.ascendingIcon
-                                }`}
-                            ></i>
-                            {orderInfo.name}
-                        </Link>
-                        <div className="dropdown-content">
-                            {Object.values(FileOrderInfos)
-                                .filter((info) => info.field !== orderBy.field)
-                                .map((info) => (
-                                    <Link
-                                        to={this.toOrderBy({ field: info.field, descending: info.defaultDescending })}
-                                        className="dropdown-option"
-                                    >
-                                        <i
-                                            className={`fas ${
-                                                info.defaultDescending ? info.descendingIcon : info.ascendingIcon
-                                            }`}
-                                        ></i>
-                                        {info.name}
-                                    </Link>
-                                ))}
-                        </div>
-                    </div>
-                </div>
-                <div className="file-list-table">
-                    {(() => {
-                        if (parent) {
-                            return (
-                                <Link
-                                    to={
-                                        parent.parents && parent.parents.length > 0
-                                            ? this.folderLink(parent.parents[0])
-                                            : '/'
-                                    }
-                                    className="file-list-row"
-                                >
-                                    <div className="file-list-column">
-                                        <i className="fas fa-folder"></i>
-                                    </div>
-                                    <div className="file-list-column">..</div>
-                                </Link>
-                            );
-                        }
-                        return;
-                    })()}
-                    {state.drives.map((drive) => (
-                        <Link to={this.folderLink(drive.id)} className="file-list-row">
-                            <div className="file-list-column">
-                                <i className="fas fa-hdd"></i>
-                            </div>
-                            <div className="file-list-column">{drive.name}</div>
-                        </Link>
-                    ))}
-                    {state.files.map((file) => {
-                        if (file.mimeType === FolderMIME) {
-                            return (
-                                <Link to={this.folderLink(file.id)} className="file-list-row">
-                                    <div className="file-list-column">
-                                        <i className="fas fa-folder"></i>
-                                    </div>
-                                    <div className="file-list-column">{file.name}</div>
-                                </Link>
-                            );
-                        } else {
-                            return (
-                                <a href={this.fileLink(file)} target="_blank" rel="nofollow" className="file-list-row">
-                                    <div className="file-list-column">
-                                        <i className={`fas ${iconFromMIME(file.mimeType)}`}></i>
-                                    </div>
-                                    <div className="file-list-column">{file.name}</div>
-                                </a>
-                            );
-                        }
-                    })}
-                    {(() => {
-                        if (state.loading) {
-                            return (
-                                <div className="file-list-row">
-                                    <div className="file-list-column">
-                                        <i className="fas fa-sync fa-spin"></i>
-                                    </div>
-                                    <div className="file-list-column">Loading...</div>
-                                </div>
-                            );
-                        }
-                        if (state.nextPageToken) {
-                            return (
-                                <a
-                                    onClick={() => this.fetchFolder(state)}
-                                    href="javascript:void(0)"
-                                    className="file-list-row"
-                                >
-                                    <div className="file-list-column">
-                                        <i className="fas fa-sync"></i>
-                                    </div>
-                                    <div className="file-list-column file-list-load-more">Load More</div>
-                                </a>
-                            );
-                        }
-                        return;
-                    })()}
-                </div>
-            </div>
-        );
-    }
+interface lsOptions {
+    url: string;
+    files: FileData[];
+    drives: DriveData[];
 }
 
-export default withRouter(FileList);
+interface walkOptions {
+    folderID: string;
+    path: FileData[];
+}
+
+export const FileList: React.FC<FileListProps> = () => {
+    const { folderID } = useParams<FileListProps>();
+
+    const [path, setPath] = React.useState<FileData[]>([]);
+    const [files, setFiles] = React.useState<FileData[]>([]);
+    const [drives, setDrives] = React.useState<DriveData[]>([]);
+    const [loading, setLoading] = React.useState(false);
+    const [pagingToken, setPagingToken] = React.useState<string | undefined>();
+
+    const location = useLocation();
+    const query = new URLSearchParams(location.search);
+
+    const orderBy = DefaultOrderChoice;
+    {
+        const field = query.get('orderBy');
+        if (field && FileOrderInfos[field]) {
+            orderBy.field = field;
+            orderBy.descending = FileOrderInfos[field].defaultDescending;
+            const desc = query.get('desc');
+            if (desc != null) {
+                orderBy.descending = desc === 'true';
+            }
+        }
+    }
+
+    const orderInfo = FileOrderInfos[orderBy.field];
+
+    const cookies = getCookies();
+
+    const linkToFolder = (parent: string): H.Location => ({ ...location, pathname: `/folder/${parent}` });
+
+    const linkToFile = (file: FileData): string =>
+        `/file/${file.id}/${encodeURIComponent(file.name)}?t=${cookies['t']}`;
+
+    const linkWithOrder = (field: string, desc: boolean): H.Location => {
+        const query = new URLSearchParams(location.search);
+        query.set('orderBy', field);
+        if (desc) {
+            query.set('desc', 'true');
+        } else {
+            query.delete('desc');
+        }
+        return { ...location, search: query.toString() };
+    };
+
+    const [ls$] = React.useState(new Subject<lsOptions>());
+    React.useEffect(() => {
+        const subscription = ls$
+            .pipe(
+                switchMap(({ url, files, drives }) => {
+                    setLoading(true);
+                    return ajax.getJSON<FileListData>(url).pipe(
+                        tap(({ files: _files, drives: _drives, nextPageToken }) => {
+                            setFiles(files.concat(_files || []));
+                            setDrives(drives.concat(_drives || []));
+                            setPagingToken(nextPageToken);
+                            setLoading(false);
+                        }),
+                    );
+                }),
+            )
+            .subscribe();
+        return () => subscription.unsubscribe();
+    }, []);
+
+    const ls = (files: FileData[], drives: DriveData[], pagingToken?: string) => {
+        const url = new URL(`${window.location.protocol}//${window.location.host}/api/list`);
+        if (folderID) {
+            url.searchParams.set('parent', folderID);
+        }
+        if (pagingToken) {
+            url.searchParams.set('pageToken', pagingToken);
+        }
+        url.searchParams.set('orderBy', orderBy.descending ? orderInfo.descendingQuery : orderInfo.ascendingQuery);
+        ls$.next({ url: url.toString(), files, drives });
+    };
+
+    React.useEffect(() => {
+        setFiles([]);
+        setDrives([]);
+        setPagingToken(undefined);
+        ls([], [], undefined);
+    }, [folderID, orderBy.field, orderBy.descending]);
+
+    const [walk$] = React.useState(new Subject<walkOptions>());
+    React.useEffect(() => {
+        const subscription = walk$
+            .pipe(
+                switchMap((walk) => {
+                    const walkStep$ = new BehaviorSubject<walkOptions>(walk);
+                    return walkStep$.pipe(
+                        concatMap(({ folderID, path }) => {
+                            const url = new URL(`${window.location.protocol}//${window.location.host}/api/file`);
+                            url.searchParams.set('id', folderID);
+                            return ajax.getJSON<FileData>(url.toString()).pipe(
+                                map((file) => {
+                                    path = [file, ...path];
+                                    if (file.parents && file.parents.length > 0) {
+                                        walkStep$.next({ folderID: file.parents[0], path });
+                                    } else {
+                                        walkStep$.complete();
+                                    }
+                                    setPath(path);
+                                    return path;
+                                }),
+                            );
+                        }),
+                    );
+                }),
+            )
+            .subscribe();
+        return () => subscription.unsubscribe();
+    }, []);
+
+    const walk = (folderID: string | undefined, path: FileData[]) => {
+        if (folderID) {
+            walk$.next({ folderID, path });
+        }
+    };
+
+    React.useEffect(() => {
+        setPath([]);
+        walk(folderID, []);
+    }, [folderID]);
+
+    return (
+        <div className="file-list">
+            <div className="nav">
+                <a href="/logout" className="button">
+                    Logout
+                </a>
+                <div className="dropdown">
+                    <Link to={linkWithOrder(orderBy.field, !orderBy.descending)} className="dropdown-choice">
+                        <i
+                            className={`fas ${orderBy.descending ? orderInfo.descendingIcon : orderInfo.ascendingIcon}`}
+                        ></i>
+                        {orderInfo.name}
+                    </Link>
+                    <div className="dropdown-content">
+                        {Object.values(FileOrderInfos)
+                            .filter((info) => info.field !== orderBy.field)
+                            .map((info) => (
+                                <Link
+                                    to={linkWithOrder(info.field, info.defaultDescending)}
+                                    className="dropdown-option"
+                                >
+                                    <i
+                                        className={`fas ${
+                                            info.defaultDescending ? info.descendingIcon : info.ascendingIcon
+                                        }`}
+                                    ></i>
+                                    {info.name}
+                                </Link>
+                            ))}
+                    </div>
+                </div>
+            </div>
+            <div className="file-list-table">
+                {(() => {
+                    const parents: JSX.Element[] = [
+                        <Link to="/" className="file-list-row">
+                            <div className="file-list-column">
+                                <i className="fas fa-folder"></i>
+                            </div>
+                            <div className="file-list-column">/</div>
+                        </Link>,
+                    ];
+                    let fullPath = '/';
+                    for (const [i, file] of path.entries()) {
+                        if (i == path.length - 1) {
+                            document.title = file.name;
+                        }
+                        fullPath += file.name + '/';
+                        parents.push(
+                            <Link to={linkToFolder(file.id)} className="file-list-row">
+                                <div className="file-list-column">
+                                    <i className="fas fa-folder"></i>
+                                </div>
+                                <div className="file-list-column">{fullPath}</div>
+                            </Link>,
+                        );
+                    }
+                    return parents;
+                })()}
+                {drives.map((drive) => (
+                    <Link to={linkToFolder(drive.id)} className="file-list-row">
+                        <div className="file-list-column">
+                            <i className="fas fa-hdd"></i>
+                        </div>
+                        <div className="file-list-column">{drive.name}</div>
+                    </Link>
+                ))}
+                {files.map((file) => {
+                    if (file.mimeType === FolderMIME) {
+                        return (
+                            <Link to={linkToFolder(file.id)} className="file-list-row">
+                                <div className="file-list-column">
+                                    <i className="fas fa-folder"></i>
+                                </div>
+                                <div className="file-list-column">{file.name}</div>
+                            </Link>
+                        );
+                    } else {
+                        return (
+                            <a href={linkToFile(file)} target="_blank" rel="nofollow" className="file-list-row">
+                                <div className="file-list-column">
+                                    <i className={`fas ${iconFromMIME(file.mimeType)}`}></i>
+                                </div>
+                                <div className="file-list-column">{file.name}</div>
+                            </a>
+                        );
+                    }
+                })}
+                {(() => {
+                    if (loading) {
+                        return (
+                            <div className="file-list-row">
+                                <div className="file-list-column">
+                                    <i className="fas fa-sync fa-spin"></i>
+                                </div>
+                                <div className="file-list-column">Loading...</div>
+                            </div>
+                        );
+                    }
+                    if (pagingToken) {
+                        return (
+                            <a
+                                onClick={() => ls(files, drives, pagingToken)}
+                                href="javascript:void(0)"
+                                className="file-list-row"
+                            >
+                                <div className="file-list-column">
+                                    <i className="fas fa-sync"></i>
+                                </div>
+                                <div className="file-list-column file-list-load-more">Load More</div>
+                            </a>
+                        );
+                    }
+                    return;
+                })()}
+            </div>
+        </div>
+    );
+};

@@ -48,6 +48,10 @@ go run ./tools/adduser
 
 Then follow the instructions to add, edit, and deploy users.
 
+## Development
+
+Launch a dev server with `npm run dev`. This will watch for any changes in source code and rebuild the component. It will start a local [Cloudworker](https://blog.cloudflare.com/cloudworker-a-local-cloudflare-worker-runner/) server that simulates the Cloudflare Worker environment. So you don't need to deploy to your actual Cloudflare account for development.
+
 ## Say Hi
 
 You are welcome to join our [Telegram Group](https://t.me/gdirectory)!
