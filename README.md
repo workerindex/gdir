@@ -9,6 +9,7 @@ A Cloudflare Worker based front-end and back-end that gives you a reversed proxy
     -   Choose a candidates window of 10 accounts every 1 minute, and randomly pick one account from the window for every request.
     -   Listing requests that carry page tokens will use the previous account to avoid paging problems.
 -   User login support. Admin can create users with password and optional whitelist and blacklist drive IDs.
+-   Search support with permission enforcements.
 -   Use GitHub, Gist, or any free static hosting services to host your encrypted account credentials, user settings, and static resources! Cloudflare Worker itself can only allow 1MB program data.
 -   Dark Mode! Yeeeeeeeeee!
 -   React.js for front-end render.
