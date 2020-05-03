@@ -21,6 +21,7 @@ const workerServerConfig = {
 const staticServerConfig = {
     port: 3005,
     host: '127.0.0.1',
+    fallback: 'index.html',
 };
 
 gulp.task('app.rollup', async () => {

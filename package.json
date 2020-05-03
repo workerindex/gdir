@@ -2,13 +2,11 @@
     "name": "gdir",
     "version": "1.0.0",
     "description": "Google Drive Directory",
-    "main": "index.js",
     "scripts": {
         "build": "gulp",
         "dev": "gulp serve"
     },
-    "author": "author",
-    "license": "MIT",
+    "license": "WTFPL",
     "devDependencies": {
         "@dollarshaveclub/cloudworker": "^0.1.2",
         "gulp-webserver": "^0.9.1",

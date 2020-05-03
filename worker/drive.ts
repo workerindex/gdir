@@ -47,8 +47,14 @@ interface TokenResponse {
 
 interface GDFileList {
     nextPageToken?: string;
-    files: any;
-    drives: any;
+    files?: any;
+    drives?: any;
+}
+
+export interface SearchOptions {
+    query: string;
+    drives?: string[];
+    encrypted_page_token?: string | null;
 }
 
 export interface User {
@@ -121,8 +127,119 @@ export class GoogleDrive {
         return file;
     }
 
+    async search(account: GoogleDriveAccount | null, options: SearchOptions): Promise<GDFileList | null> {
+        let pageTokenMap: Record<string, string> = {};
+        let { query, drives, encrypted_page_token } = options;
+
+        if (account == null && typeof encrypted_page_token === 'string' && encrypted_page_token !== '') {
+            const data = JSON.parse(
+                buf2str(await this.decrypt('pageToken', base64.RAWURL.decode(encrypted_page_token))),
+            );
+            account = data.account;
+            pageTokenMap = data.pageTokenMap;
+        }
+
+        if (account == null) {
+            account = await this.pickAccount();
+        }
+
+        const url = new URL('https://www.googleapis.com/drive/v3/files');
+        url.searchParams.set('includeItemsFromAllDrives', 'true');
+        url.searchParams.set('supportsAllDrives', 'true');
+        url.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType,size,modifiedTime,parents)');
+        url.searchParams.set('pageSize', '100');
+
+        const clauses: string[] = [];
+
+        query
+            .replace(/\\/, '\\\\')
+            .replace(/'/, "\\'")
+            .split(/\s+/)
+            .forEach((term) => term !== '' && clauses.push(`fullText contains '${term}'`));
+
+        clauses.push('trashed = false');
+
+        url.searchParams.set('q', clauses.join(' and '));
+
+        const searchInDrive = async (drive?: string) => {
+            const _url = new URL(url.toString());
+
+            if (drive) {
+                _url.searchParams.set('driveId', drive);
+                _url.searchParams.set('corpora', 'drive');
+                if (pageTokenMap[drive]) {
+                    _url.searchParams.set('pageToken', pageTokenMap[drive]);
+                }
+            } else {
+                _url.searchParams.set('corpora', 'allDrives');
+                if (pageTokenMap['global']) {
+                    _url.searchParams.set('pageToken', pageTokenMap['global']);
+                }
+            }
+
+            const response = await (
+                await fetch(_url.toString(), {
+                    headers: {
+                        Authorization: `Bearer ${await this.accessToken(account as GoogleDriveAccount)}`,
+                    },
+                })
+            ).json();
+
+            if (response.nextPageToken) {
+                if (drive) {
+                    pageTokenMap[drive] = response.nextPageToken;
+                } else {
+                    pageTokenMap['global'] = response.nextPageToken;
+                }
+            } else {
+                if (drive) {
+                    delete pageTokenMap[drive];
+                } else if (pageTokenMap['global']) {
+                    delete pageTokenMap['global'];
+                }
+            }
+
+            console.log('url = ', _url.toString());
+            console.log('token = ', await this.accessToken(account as GoogleDriveAccount));
+            console.log('drive = ', drive, response);
+
+            if (!response.files) {
+                response.files = [];
+            }
+
+            return response;
+        };
+
+        const promises: Promise<any>[] = [];
+
+        if (drives && drives.length > 0) {
+            for (const drive of drives) {
+                promises.push(searchInDrive(drive));
+            }
+        } else {
+            promises.push(searchInDrive());
+        }
+
+        const responses = await Promise.all(promises);
+
+        let nextPageToken: string | undefined;
+
+        if (Object.keys(pageTokenMap).length > 0) {
+            nextPageToken = base64.RAWURL.encode(
+                await this.encrypt('pageToken', JSON.stringify({ account, pageTokenMap })),
+            );
+        }
+
+        let files: any[] = [];
+        for (const response of responses) {
+            files = [...files, ...response.files];
+        }
+
+        return { nextPageToken, files };
+    }
+
     async ls(
-        account: GoogleDriveAccount | null,
+        account?: GoogleDriveAccount | null,
         parent?: string | null,
         orderBy?: string | null,
         encrypted_page_token?: string | null,
@@ -148,7 +265,7 @@ export class GoogleDrive {
             url.searchParams.set('includeItemsFromAllDrives', 'true');
             url.searchParams.set('supportsAllDrives', 'true');
             url.searchParams.set('q', `'${parent}' in parents and trashed = false`);
-            url.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType,size,modifiedTime)');
+            url.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType,size,modifiedTime,parents)');
             url.searchParams.set('pageSize', '100');
             if (orderBy) {
                 url.searchParams.set('orderBy', orderBy);
@@ -189,6 +306,79 @@ export class GoogleDrive {
             files: response.files,
             drives: response.drives,
         };
+    }
+
+    async copyFileInit(account: GoogleDriveAccount | null, src: string, dst: string): Promise<Response> {
+        if (account == null) {
+            account = await this.pickAccount();
+        }
+        const file = await this.file(account, src);
+        const url = new URL('https://www.googleapis.com/upload/drive/v3/files');
+        url.searchParams.set('uploadType', 'resumable');
+        url.searchParams.set('supportsAllDrives', 'true');
+        const response = await fetch(url.toString(), {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${await this.accessToken(account)}`,
+                'Content-Type': 'application/json; charset=UTF-8',
+                'X-Upload-Content-Type': `${file.mimeType}`,
+                'X-Upload-Content-Length': `${file.size}`,
+            },
+            body: JSON.stringify({
+                name: file.name,
+                parents: [dst],
+            }),
+        });
+        const location = new URL(response.headers.get('Location') as string);
+        console.log(location.toString());
+        return new Response(JSON.stringify({ ...file, token: location.searchParams.get('upload_id') as string }));
+    }
+
+    async copyFileExec(account: GoogleDriveAccount | null, src: string, token: string): Promise<Response> {
+        if (account == null) {
+            account = await this.pickAccount();
+        }
+        const location = `https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&upload_id=${token}`;
+        const data = await this.download(account, src);
+        return fetch(location, {
+            method: 'PUT',
+            headers: {
+                'Content-Length': data.headers.get('Content-Length') as string,
+                'Content-Type': data.headers.get('Content-Type') as string,
+            },
+            body: data.body,
+        });
+    }
+
+    async copyFileStat(account: GoogleDriveAccount | null, token: string): Promise<Response> {
+        const location = `https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&upload_id=${token}`;
+        const response = await fetch(location, {
+            method: 'PUT',
+            headers: {
+                'Content-Range': 'bytes */*',
+            },
+        });
+        if (response.status === 200) {
+            const file = await response.json();
+            return new Response(JSON.stringify({ ...file, status: 'uploaded' }));
+        }
+        if (response.status === 404) {
+            return new Response(JSON.stringify({ status: 'expired' }));
+        }
+        if (response.status === 308) {
+            const range = response.headers.get('Range');
+            let uploaded = 0;
+            if (range) {
+                const m = range.match(/bytes=0-(\d+)/);
+                if (m) {
+                    uploaded = parseInt(m[1]);
+                }
+            }
+            return new Response(JSON.stringify({ status: 'uploading', uploaded }));
+        }
+        return new Response(
+            JSON.stringify({ status: 'error', message: `unexpected API response status: ${response.status}` }),
+        );
     }
 
     async secretKey(namespace: string): Promise<CryptoKey> {

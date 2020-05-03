@@ -105,6 +105,13 @@ a {
     flex-direction: column;
     min-height: 100vh;
     display: flex;
+
+    hr {
+        width: 100%;
+        border: 0;
+        height: 2px;
+        background: #333;
+    }
 }
 
 .nav {
@@ -116,6 +123,18 @@ a {
 
     & > * {
         margin: 0 5px;
+    }
+}
+
+input[type='text'].search-input {
+    padding: 10px 15px;
+    border-radius: 3px;
+    margin: 0;
+    background-color: #222;
+    text-align: left;
+    flex-grow: 1;
+    &:focus {
+        background-color: #434343;
     }
 }
 
@@ -178,6 +197,7 @@ a {
         padding: 3px 0;
 
         transition: all 0.2s;
+        &.file-list-highlight,
         &:hover {
             background-color: #bcbcbc42;
             * {

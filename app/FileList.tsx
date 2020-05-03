@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Subject, BehaviorSubject } from 'rxjs';
 import { ajax } from 'rxjs/ajax';
 import { switchMap, tap, concatMap, map } from 'rxjs/operators';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useHistory } from 'react-router-dom';
 import { getCookies, iconFromMIME } from 'utils';
 import * as H from 'history';
 
@@ -110,6 +110,11 @@ interface lsOptions {
     drives: DriveData[];
 }
 
+interface searchOptions {
+    url: string;
+    files: FileData[];
+}
+
 interface walkOptions {
     folderID: string;
     path: FileData[];
@@ -122,10 +127,27 @@ export const FileList: React.FC<FileListProps> = () => {
     const [files, setFiles] = React.useState<FileData[]>([]);
     const [drives, setDrives] = React.useState<DriveData[]>([]);
     const [loading, setLoading] = React.useState(false);
+    const [searchQuery, setSearchQuery] = React.useState<string>('');
     const [pagingToken, setPagingToken] = React.useState<string | undefined>();
 
+    const history = useHistory();
     const location = useLocation();
     const query = new URLSearchParams(location.search);
+
+    const isSearch = location.pathname.startsWith('/search');
+    if (isSearch) {
+        const q = query.get('q');
+        if (q) {
+            if (q !== searchQuery) {
+                setSearchQuery(q);
+            }
+        } else {
+            if (searchQuery !== '') {
+                setSearchQuery('');
+            }
+        }
+    }
+    const highlight = query.get('highlight');
 
     const orderBy = DefaultOrderChoice;
     {
@@ -144,7 +166,15 @@ export const FileList: React.FC<FileListProps> = () => {
 
     const cookies = getCookies();
 
-    const linkToFolder = (parent: string): H.Location => ({ ...location, pathname: `/folder/${parent}` });
+    const linkToFolder = (parent: string, highlight?: string): H.Location => {
+        const url: H.Location = { ...location, pathname: `/folder/${parent}` };
+        const search = new URLSearchParams(url.search);
+        if (highlight && highlight !== '') {
+            search.set('highlight', highlight);
+        }
+        url.search = search.toString();
+        return url;
+    };
 
     const linkToFile = (file: FileData): string =>
         `/file/${file.id}/${encodeURIComponent(file.name)}?t=${cookies['t']}`;
@@ -158,6 +188,13 @@ export const FileList: React.FC<FileListProps> = () => {
             query.delete('desc');
         }
         return { ...location, search: query.toString() };
+    };
+
+    const highlightClassNames = (id: string, ...cls: string[]) => {
+        if (highlight === id) {
+            cls.push('file-list-highlight');
+        }
+        return cls.join(' ');
     };
 
     const [ls$] = React.useState(new Subject<lsOptions>());
@@ -192,12 +229,44 @@ export const FileList: React.FC<FileListProps> = () => {
         ls$.next({ url: url.toString(), files, drives });
     };
 
+    const [search$] = React.useState(new Subject<searchOptions>());
+    React.useEffect(() => {
+        const subscription = search$
+            .pipe(
+                switchMap(({ url, files }) => {
+                    setLoading(true);
+                    return ajax.getJSON<FileListData>(url).pipe(
+                        tap(({ files: _files, nextPageToken }) => {
+                            setFiles(files.concat(_files || []));
+                            setPagingToken(nextPageToken);
+                            setLoading(false);
+                        }),
+                    );
+                }),
+            )
+            .subscribe();
+        return () => subscription.unsubscribe();
+    }, []);
+
+    const search = (files: FileData[], pagingToken?: string) => {
+        const url = new URL(`${window.location.protocol}//${window.location.host}/api/search`);
+        url.searchParams.set('q', searchQuery);
+        if (pagingToken) {
+            url.searchParams.set('pageToken', pagingToken);
+        }
+        search$.next({ url: url.toString(), files });
+    };
+
     React.useEffect(() => {
         setFiles([]);
         setDrives([]);
         setPagingToken(undefined);
-        ls([], [], undefined);
-    }, [folderID, orderBy.field, orderBy.descending]);
+        if (isSearch) {
+            search([]);
+        } else {
+            ls([], []);
+        }
+    }, [isSearch, isSearch ? searchQuery : folderID, orderBy.field, orderBy.descending]);
 
     const [walk$] = React.useState(new Subject<walkOptions>());
     React.useEffect(() => {
@@ -237,8 +306,10 @@ export const FileList: React.FC<FileListProps> = () => {
 
     React.useEffect(() => {
         setPath([]);
-        walk(folderID, []);
-    }, [folderID]);
+        if (!isSearch) {
+            walk(folderID, []);
+        }
+    }, [isSearch, isSearch ? searchQuery : folderID]);
 
     return (
         <div className="file-list">
@@ -271,6 +342,20 @@ export const FileList: React.FC<FileListProps> = () => {
                             ))}
                     </div>
                 </div>
+                <input
+                    type="text"
+                    className="search-input"
+                    placeholder="Search..."
+                    value={searchQuery}
+                    onKeyUp={(event) => {
+                        const search = new URLSearchParams();
+                        search.set('q', searchQuery);
+                        if (event.key === 'Enter') {
+                            history.push(`/search?${search.toString()}`);
+                        }
+                    }}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                />
             </div>
             <div className="file-list-table">
                 {(() => {
@@ -299,8 +384,9 @@ export const FileList: React.FC<FileListProps> = () => {
                     }
                     return parents;
                 })()}
+                <hr />
                 {drives.map((drive) => (
-                    <Link to={linkToFolder(drive.id)} className="file-list-row">
+                    <Link to={linkToFolder(drive.id)} className={highlightClassNames(drive.id, 'file-list-row')}>
                         <div className="file-list-column">
                             <i className="fas fa-hdd"></i>
                         </div>
@@ -310,7 +396,13 @@ export const FileList: React.FC<FileListProps> = () => {
                 {files.map((file) => {
                     if (file.mimeType === FolderMIME) {
                         return (
-                            <Link to={linkToFolder(file.id)} className="file-list-row">
+                            <Link
+                                to={linkToFolder(
+                                    isSearch ? (file as any).parents[0] : file.id,
+                                    isSearch ? file.id : undefined,
+                                )}
+                                className={highlightClassNames(file.id, 'file-list-row')}
+                            >
                                 <div className="file-list-column">
                                     <i className="fas fa-folder"></i>
                                 </div>
@@ -318,14 +410,33 @@ export const FileList: React.FC<FileListProps> = () => {
                             </Link>
                         );
                     } else {
-                        return (
-                            <a href={linkToFile(file)} target="_blank" rel="nofollow" className="file-list-row">
-                                <div className="file-list-column">
-                                    <i className={`fas ${iconFromMIME(file.mimeType)}`}></i>
-                                </div>
-                                <div className="file-list-column">{file.name}</div>
-                            </a>
-                        );
+                        if (isSearch) {
+                            return (
+                                <Link
+                                    to={linkToFolder((file as any).parents[0], file.id)}
+                                    className={highlightClassNames(file.id, 'file-list-row')}
+                                >
+                                    <div className="file-list-column">
+                                        <i className={`fas ${iconFromMIME(file.mimeType)}`}></i>
+                                    </div>
+                                    <div className="file-list-column">{file.name}</div>
+                                </Link>
+                            );
+                        } else {
+                            return (
+                                <a
+                                    href={linkToFile(file)}
+                                    target="_blank"
+                                    rel="nofollow"
+                                    className={highlightClassNames(file.id, 'file-list-row')}
+                                >
+                                    <div className="file-list-column">
+                                        <i className={`fas ${iconFromMIME(file.mimeType)}`}></i>
+                                    </div>
+                                    <div className="file-list-column">{file.name}</div>
+                                </a>
+                            );
+                        }
                     }
                 })}
                 {(() => {
@@ -342,7 +453,7 @@ export const FileList: React.FC<FileListProps> = () => {
                     if (pagingToken) {
                         return (
                             <a
-                                onClick={() => ls(files, drives, pagingToken)}
+                                onClick={() => (isSearch ? search(files, pagingToken) : ls(files, drives, pagingToken))}
                                 href="javascript:void(0)"
                                 className="file-list-row"
                             >

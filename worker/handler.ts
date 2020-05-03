@@ -82,6 +82,21 @@ export async function handleRequest(request: Request): Promise<Response> {
             }
         }
 
+        if (url.pathname === '/api/search' && user) {
+            const query = getParam('q', form, params) || '';
+            const encrypted_page_token = getParam('pageToken', form, params);
+            const drives: string[] = [];
+            if (user.drives_black_list && user.drives_black_list.length > 0) {
+                (((await gd.ls()) as any).drives || []).forEach((drive: any) => {
+                    ((user as any).drives_black_list as string[]).indexOf(drive.id) < 0 && drives.push(drive.id);
+                });
+            } else if (user.drives_white_list && user.drives_white_list.length > 0) {
+                drives.push(...user.drives_white_list);
+            }
+            const fileList = await gd.search(null, { query, drives, encrypted_page_token });
+            return new Response(JSON.stringify(fileList), { headers: { 'Content-Type': 'application/json' } });
+        }
+
         if (url.pathname === '/api/file' && user) {
             const id = getParam('id', form, params);
             if (!id || validDriveForUser(id, user)) {
@@ -93,6 +108,29 @@ export async function handleRequest(request: Request): Promise<Response> {
                 ) {
                     return new Response(JSON.stringify(file), { headers: { 'Content-Type': 'application/json' } });
                 }
+            }
+        }
+
+        if (url.pathname === '/api/copyFileInit' && user) {
+            const src = getParam('src', form, params);
+            const dst = getParam('dst', form, params);
+            if (src && dst) {
+                return gd.copyFileInit(null, src as string, dst as string);
+            }
+        }
+
+        if (url.pathname === '/api/copyFileExec' && user) {
+            const src = getParam('src', form, params);
+            const token = getParam('token', form, params);
+            if (src && token) {
+                return gd.copyFileExec(null, src as string, token as string);
+            }
+        }
+
+        if (url.pathname === '/api/copyFileStat' && user) {
+            const token = getParam('token', form, params);
+            if (token) {
+                return gd.copyFileStat(null, token as string);
             }
         }
 

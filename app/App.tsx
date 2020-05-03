@@ -24,6 +24,9 @@ export default class App extends React.Component {
                 <Route path="/folder/:folderID">
                     <FileList />
                 </Route>
+                <Route path="/search">
+                    <FileList />
+                </Route>
             </Switch>
         </BrowserRouter>
     );
