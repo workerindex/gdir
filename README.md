@@ -2,6 +2,8 @@
 
 A Cloudflare Worker based front-end and back-end that gives you a reversed proxy for your Google Drive contents!
 
+[中文教程（感謝 HE-SB）](https://tech.he-sb.top/posts/usage-of-gdir/)
+
 ## Features
 
 -   Supports both User Accounts (UA) with OAuth2 token, and Service Accounts (SA) with JWT token.
@@ -36,6 +38,8 @@ go run ./tools/setup
 ```
 
 Then follow the instructions to setup and deploy your gdir instance.
+
+**NOTE:** Linux users should use a non-root user to setup gdir. As root may fail in some Linux systems during `npm install`.
 
 **Note:** Windows users may or may not experience with random failures during `npm install`. Typically with failure messages like `Error: PERM: operation not permitted`. This is usually your antivirus is reading some files while npm is trying to remove them. Try turning off your antivirus, remove the `node_modules` folder and try again.
 
