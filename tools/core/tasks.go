@@ -696,7 +696,15 @@ func NpmInstall() (err error) {
 		}
 	}
 	if _, err = os.Stat("node_modules"); os.IsNotExist(err) {
-		cmd := exec.Command("npm", "install", "--unsafe-perm", "--production")
+		cmd := exec.Command("npm", "install", "--unsafe-perm", "--production", "--ignore-scripts")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err = cmd.Run(); err != nil {
+			return
+		}
+	}
+	if _, err = os.Stat("node_modules"); os.IsNotExist(err) {
+		cmd := exec.Command("node", "./node_modules/node-sass/scripts/install.js")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		err = cmd.Run()
