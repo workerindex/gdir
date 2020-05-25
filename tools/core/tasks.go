@@ -785,6 +785,23 @@ func InitGitRepo(dir string, httpsRemote string, sshRemote string) (err error) {
 	return
 }
 
+func CopyStaticFiles() (err error) {
+	files, err := ioutil.ReadDir("static")
+	if err != nil {
+		return
+	}
+	for _, file := range files {
+		if file.Name() == ".git" {
+			continue
+		}
+		if err = os.RemoveAll(filepath.Join("static", file.Name())); err != nil {
+			return
+		}
+	}
+	err = CopyDir("dist/static", "static")
+	return
+}
+
 func DeployWorker() (err error) {
 	b, err := ioutil.ReadFile("dist/worker.js")
 	if err != nil {

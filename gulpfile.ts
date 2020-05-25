@@ -39,7 +39,7 @@ gulp.task('app.rollup', async () => {
     };
     const output: RollupOptions = {
         output: {
-            file: './static/app.js',
+            file: './dist/static/app.js',
             format: 'iife',
             sourcemap: true,
             globals: {
@@ -58,10 +58,10 @@ gulp.task('app.rollup', async () => {
 });
 
 gulp.task('app.scss', () =>
-    gulp.src('./app/styles/**/*.scss').pipe(sass().on('error', sass.logError)).pipe(gulp.dest('./static')),
+    gulp.src('./app/styles/**/*.scss').pipe(sass().on('error', sass.logError)).pipe(gulp.dest('./dist/static')),
 );
 
-gulp.task('app.static', () => gulp.src(['./app/**/*.html', './app/favicon.ico']).pipe(gulp.dest('./static')));
+gulp.task('app.static', () => gulp.src(['./app/**/*.html', './app/favicon.ico']).pipe(gulp.dest('./dist/static')));
 
 gulp.task('worker.rollup', async () => {
     const output: OutputOptions = {
@@ -90,7 +90,9 @@ gulp.task('worker.rollup', async () => {
 
 gulp.task('worker.config', async () => {});
 
-gulp.task('clean', async () => Promise.all([rmfr('./dist/*.*', { glob: {} }), rmfr('./static/*.*', { glob: {} })]));
+gulp.task('clean', async () =>
+    Promise.all([rmfr('./dist/*.*', { glob: {} }), rmfr('./dist/static/*.*', { glob: {} })]),
+);
 
 gulp.task('dist', series('clean', 'app.rollup', 'app.scss', 'app.static', 'worker.rollup'));
 
@@ -147,7 +149,7 @@ gulp.task(
             },
             async () => {
                 const webserver = require('gulp-webserver');
-                return gulp.src(['./accounts', './users', './static']).pipe(webserver(staticServerConfig));
+                return gulp.src(['./accounts', './users', './dist/static']).pipe(webserver(staticServerConfig));
             },
         ),
     ),

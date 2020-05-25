@@ -91,6 +91,10 @@ func run() (err error) {
 		return
 	}
 
+	if err = core.CopyStaticFiles(); err != nil {
+		return
+	}
+
 	if err = core.DeployGist("accounts", core.Config.GistID.Accounts); err != nil {
 		return
 	}
