@@ -703,6 +703,9 @@ func SaveUser(user *User) (err error) {
 }
 
 func DeployGist(dir string, gistID string) (err error) {
+	if err = os.MkdirAll(dir, 0700); err != nil {
+		return
+	}
 	if _, err = os.Stat(filepath.Join(dir, ".git")); os.IsNotExist(err) {
 		fmt.Printf("Initializing Git repo in %s...\n", dir)
 		if err = InitGitRepo(
