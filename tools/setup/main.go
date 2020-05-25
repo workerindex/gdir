@@ -91,14 +91,6 @@ func run() (err error) {
 		return
 	}
 
-	if err = core.NpmInstall(); err != nil {
-		return
-	}
-
-	if err = core.NpmBuild(); err != nil {
-		return
-	}
-
 	if err = core.DeployGist("accounts", core.Config.GistID.Accounts); err != nil {
 		return
 	}

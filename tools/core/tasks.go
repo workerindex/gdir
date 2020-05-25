@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -74,8 +73,10 @@ func EnterCloudflareEmail() (err error) {
 		}
 	}
 	if Config.CloudflareEmail == "" {
-		fmt.Printf("Your Cloudflare login Email: ")
-		fmt.Scanln(&Config.CloudflareEmail)
+		for loop := true; loop; loop = Config.CloudflareEmail == "" {
+			fmt.Printf("Your Cloudflare login Email: ")
+			fmt.Scanln(&Config.CloudflareEmail)
+		}
 		fmt.Println("")
 		err = SaveConfigFile()
 	}
@@ -90,9 +91,11 @@ func EnterCloudflareKey() (err error) {
 		}
 	}
 	if Config.CloudflareKey == "" {
-		fmt.Println("Please visit https://dash.cloudflare.com/profile/api-tokens and get")
-		fmt.Printf("your Global API Key: ")
-		fmt.Scanln(&Config.CloudflareKey)
+		for loop := true; loop; loop = Config.CloudflareKey == "" {
+			fmt.Println("Please visit https://dash.cloudflare.com/profile/api-tokens and get")
+			fmt.Printf("your Global API Key: ")
+			fmt.Scanln(&Config.CloudflareKey)
+		}
 		fmt.Println("")
 		err = SaveConfigFile()
 	}
@@ -121,6 +124,9 @@ func SelectCloudflareAccount() (err error) {
 		if len(accounts) == 0 {
 			err = fmt.Errorf("no accounts under your cloudflare")
 			return
+		}
+		if len(accounts) == 1 {
+			Config.CloudflareAccount = accounts[0].ID
 		} else {
 			fmt.Println("Your available Cloudflare accounts:")
 			for i, account := range accounts {
@@ -135,9 +141,9 @@ func SelectCloudflareAccount() (err error) {
 				Config.CloudflareAccount = accounts[selection-1].ID
 				break
 			}
-			if err = SaveConfigFile(); err != nil {
-				return
-			}
+		}
+		if err = SaveConfigFile(); err != nil {
+			return
 		}
 	}
 	Cf.AccountID = Config.CloudflareAccount
@@ -165,9 +171,14 @@ func SelectWorker() (err error) {
 			for i, worker := range resp.WorkerList {
 				fmt.Printf("    (%d) %s\n", i+1, worker.ID)
 			}
+			fmt.Println("    (0) Create a new Worker     (Default)")
 			for {
-				fmt.Printf("Choose one or enter 0 to create a new Worker: ")
+				fmt.Printf("Choose one of above: ")
 				fmt.Scanln(&line)
+				if regexp.MustCompile(`^\s*$`).MatchString(line) {
+					err = EnterNewWorkerName()
+					break
+				}
 				if selection, err = strconv.ParseUint(line, 10, 64); err != nil {
 					continue
 				}
@@ -223,9 +234,11 @@ func EnterGistToken() (err error) {
 		}
 	}
 	if Config.GistToken == "" {
-		fmt.Println("Please visit https://github.com/settings/tokens and generate a new")
-		fmt.Printf("token with \"gist\" scope: ")
-		fmt.Scanln(&Config.GistToken)
+		for loop := true; loop; loop = Config.GistToken == "" {
+			fmt.Println("Please visit https://github.com/settings/tokens and generate a new")
+			fmt.Printf("token with \"gist\" scope: ")
+			fmt.Scanln(&Config.GistToken)
+		}
 		fmt.Println("")
 		err = SaveConfigFile()
 	}
@@ -292,22 +305,18 @@ func EnterGistID(name string, conf *string) (err error) {
 		fmt.Printf("Please enter a Gist URL / ID for %s: ", name)
 		fmt.Scanln(&line)
 		line = strings.TrimSpace(line)
-		if regexp.MustCompile(`^https?://`).MatchString(line) {
-			var u *url.URL
-			if u, err = url.Parse(line); err != nil {
-				err = nil
-				continue
-			}
-			parts := strings.Split(u.Path, "/")
-			if len(parts) < 2 {
-				continue
-			}
-			*conf = parts[1]
-			break
-		} else if regexp.MustCompile(`^[0-9a-fA-F]{32}$`).MatchString(line) {
-			*conf = line
-			break
+		if m := regexp.MustCompile(`^\s*([0-9a-fA-F]{32})\s*$`).FindStringSubmatch(line); m != nil {
+			*conf = m[1]
+		} else if m := regexp.MustCompile(`^\s*git\@gist\.github\.com\:([0-9a-fA-F]{32})(\.git)?\s*$`).FindStringSubmatch(line); m != nil {
+			*conf = m[1]
+		} else if m := regexp.MustCompile(`\s*https?\:\/\/gist\.github\.com\/([0-9a-fA-F]{32})(\.git)?\s*$`).FindStringSubmatch(line); m != nil {
+			*conf = m[1]
+		} else if m := regexp.MustCompile(`^\s*https?\:\/\/gist\.github\.com\/[^\/]+\/([0-9a-fA-F]{32})\s*$`).FindStringSubmatch(line); m != nil {
+			*conf = m[1]
+		} else {
+			continue
 		}
+		break
 	}
 	return SaveConfigFile()
 }
@@ -437,9 +446,11 @@ func EnterAccountsJSONDir() (err error) {
 		}
 	}
 	if Config.AccountsJSONDir == "" {
-		fmt.Println("Please follow https://github.com/xyou365/AutoRclone to generate")
-		fmt.Printf("Accounts JSON directory: ")
-		fmt.Scanln(&Config.AccountsJSONDir)
+		for loop := true; loop; loop = Config.AccountsJSONDir == "" {
+			fmt.Println("Please follow https://github.com/xyou365/AutoRclone to generate")
+			fmt.Printf("Accounts JSON directory: ")
+			fmt.Scanln(&Config.AccountsJSONDir)
+		}
 		fmt.Println("")
 		err = SaveConfigFile()
 	}
@@ -494,6 +505,7 @@ func ProcessAccountsJSONDir() (err error) {
 func ConfigureAdminUser() (err error) {
 	var user User
 	var files []os.FileInfo
+	var bytePassword []byte
 	if _, err = os.Stat("users"); !os.IsNotExist(err) {
 		if files, err = ioutil.ReadDir("users"); err != nil {
 			return
@@ -509,15 +521,18 @@ func ConfigureAdminUser() (err error) {
 		}
 	}
 	fmt.Println("Add an admin user...")
-	fmt.Printf("Please enter your admin user name: ")
-	fmt.Scanln(&user.Name)
-	fmt.Printf("Please enter your admin user password: ")
-	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-	if err != nil {
-		return
+	for loop := true; loop; loop = user.Name == "" {
+		fmt.Printf("Please enter your admin user name: ")
+		fmt.Scanln(&user.Name)
 	}
-	fmt.Println()
-	user.Pass = string(bytePassword)
+	for loop := true; loop; loop = user.Pass == "" {
+		fmt.Printf("Please enter your admin user password: ")
+		if bytePassword, err = terminal.ReadPassword(int(syscall.Stdin)); err != nil {
+			return
+		}
+		fmt.Println()
+		user.Pass = string(bytePassword)
+	}
 	return SaveUser(&user)
 }
 
@@ -687,38 +702,6 @@ func SaveUser(user *User) (err error) {
 	return ioutil.WriteFile(userPath, b, 0600)
 }
 
-func NpmInstall() (err error) {
-	if _, err = os.Stat("node_modules"); !os.IsNotExist(err) {
-		if PromptYesNoWithDefault("Directory node_modules already exists. Do you want to re-run npm install?", false) {
-			if err = os.RemoveAll("node_modules"); err != nil {
-				return
-			}
-		}
-	}
-	if _, err = os.Stat("node_modules"); os.IsNotExist(err) {
-		cmd := exec.Command("npm", "install", "--unsafe-perm", "--production", "--ignore-scripts")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err = cmd.Run(); err != nil {
-			return
-		}
-	}
-	if _, err = os.Stat("node_modules"); os.IsNotExist(err) {
-		cmd := exec.Command("node", "./node_modules/node-sass/scripts/install.js")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err = cmd.Run()
-	}
-	return
-}
-
-func NpmBuild() (err error) {
-	cmd := exec.Command("npm", "run", "build")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
 func DeployGist(dir string, gistID string) (err error) {
 	if _, err = os.Stat(filepath.Join(dir, ".git")); os.IsNotExist(err) {
 		fmt.Printf("Initializing Git repo in %s...\n", dir)
@@ -800,10 +783,20 @@ func InitGitRepo(dir string, httpsRemote string, sshRemote string) (err error) {
 }
 
 func DeployWorker() (err error) {
-	script, err := ioutil.ReadFile("dist/worker.js")
+	b, err := ioutil.ReadFile("dist/worker.js")
 	if err != nil {
 		return
 	}
+	r := strings.NewReplacer(
+		"__SECRET__", Config.SecretKey,
+		"__ACCOUNTS_COUNT__", strconv.FormatUint(Config.AccountsCount, 10),
+		"__ACCOUNT_ROTATION__", strconv.FormatUint(Config.AccountRotation, 10),
+		"__ACCOUNT_CANDIDATES__", strconv.FormatUint(Config.AccountCandidates, 10),
+		"__USERS_URL__", fmt.Sprintf("https://gist.githubusercontent.com/%s/%s/raw/", Config.GistUser, Config.GistID.Users),
+		"__STATIC_URL__", fmt.Sprintf("https://gist.githubusercontent.com/%s/%s/raw/", Config.GistUser, Config.GistID.Static),
+		"__ACCOUNTS_URL__", fmt.Sprintf("https://gist.githubusercontent.com/%s/%s/raw/", Config.GistUser, Config.GistID.Accounts),
+	)
+	script := r.Replace(string(b))
 	fmt.Printf("Deploying Cloudflare Worker %s...\n", Config.CloudflareWorker)
 	_, err = Cf.UploadWorker(&cloudflare.WorkerRequestParams{
 		ScriptName: Config.CloudflareWorker,

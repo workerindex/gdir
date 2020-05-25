@@ -106,13 +106,15 @@ func enterPassword() (err error) {
 		}
 	}
 	if args.newUser.Pass == "" {
-		fmt.Printf("Password: ")
-		bytePassword, err = terminal.ReadPassword(int(syscall.Stdin))
-		if err != nil {
-			return
+		for loop := true; loop; loop = args.newUser.Pass == "" {
+			fmt.Printf("Password: ")
+			bytePassword, err = terminal.ReadPassword(int(syscall.Stdin))
+			if err != nil {
+				return
+			}
+			fmt.Println()
+			args.newUser.Pass = string(bytePassword)
 		}
-		fmt.Println()
-		args.newUser.Pass = string(bytePassword)
 	}
 	return
 }

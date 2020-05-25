@@ -1,16 +1,12 @@
 import fs from 'fs';
 import rmfr from 'rmfr';
-import glob from 'glob';
 import sass from 'gulp-sass';
 import * as gulp from 'gulp';
 import { rollup, RollupOptions, OutputOptions } from 'rollup';
 import { series, parallel, watch } from 'gulp';
-import replace from '@rollup/plugin-replace';
 import commonjs from '@rollup/plugin-commonjs';
 import resolve from '@rollup/plugin-node-resolve';
 import typescriptPlugin from '@rollup/plugin-typescript';
-
-const config = require('./config');
 
 const workerServerConfig = {
     port: 3000,
@@ -68,28 +64,14 @@ gulp.task('app.scss', () =>
 gulp.task('app.static', () => gulp.src(['./app/**/*.html', './app/favicon.ico']).pipe(gulp.dest('./static')));
 
 gulp.task('worker.rollup', async () => {
-    if (!config.accountsURL) {
-        config.accountsURL = `https://gist.githubusercontent.com/${config.gist_user}/${config.gist_id.accounts}/raw/`;
-    }
-    if (!config.usersURL) {
-        config.usersURL = `https://gist.githubusercontent.com/${config.gist_user}/${config.gist_id.users}/raw/`;
-    }
-    if (!config.staticURL) {
-        config.staticURL = `https://gist.githubusercontent.com/${config.gist_user}/${config.gist_id.static}/raw`;
-    }
+    const output: OutputOptions = {
+        file: './dist/worker.js',
+        format: 'iife',
+        sourcemap: true,
+    };
     const input: RollupOptions = {
         input: './worker/index.ts',
         plugins: [
-            replace({
-                __SECRET__: config.secret_key,
-                'length: 1000': `length: ${config.accounts_count}`,
-                'accountRotation: 60': `accountRotation: ${config.account_rotation}`,
-                'accountCandidates: 10': `accountCandidates: ${config.account_candidates}`,
-                __ACCOUNTS_URL__: config.accountsURL,
-                __USERS_URL__: config.usersURL,
-                __STATIC_URL__: config.staticURL,
-                include: './worker/config.ts',
-            }),
             resolve({
                 extensions: ['.js', '.ts'],
             }),
@@ -102,17 +84,15 @@ gulp.task('worker.rollup', async () => {
             }),
         ],
     };
-    const output: OutputOptions = {
-        file: './dist/worker.js',
-        format: 'iife',
-        sourcemap: true,
-    };
-
     const bundle = await rollup(input);
     await bundle.write(output);
 });
 
+gulp.task('worker.config', async () => {});
+
 gulp.task('clean', async () => Promise.all([rmfr('./dist/*.*', { glob: {} }), rmfr('./static/*.*', { glob: {} })]));
+
+gulp.task('dist', series('clean', 'app.rollup', 'app.scss', 'app.static', 'worker.rollup'));
 
 gulp.task('default', series('clean', 'app.rollup', 'app.scss', 'app.static', 'worker.rollup'));
 
@@ -125,11 +105,6 @@ gulp.task('watch', () => {
 gulp.task(
     'serve',
     series(
-        async () => {
-            config.accountsURL = `http://${staticServerConfig.host}:${staticServerConfig.port}/`;
-            config.usersURL = `http://${staticServerConfig.host}:${staticServerConfig.port}/`;
-            config.staticURL = `http://${staticServerConfig.host}:${staticServerConfig.port}`;
-        },
         'default',
         parallel(
             'watch',
@@ -152,9 +127,17 @@ gulp.task(
                         }
                         return;
                     }
-                    server = new Cloudworker(fs.readFileSync('./dist/worker.js', 'utf-8'), {
-                        debug,
-                    }).listen(port, host);
+                    const config = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
+                    const script = fs
+                        .readFileSync('./dist/worker.js', 'utf-8')
+                        .replace('__SECRET__', `${config.secret_key}`)
+                        .replace('__ACCOUNTS_COUNT__', `${config.accounts_count}`)
+                        .replace('__ACCOUNT_ROTATION__', `${config.account_rotation}`)
+                        .replace('__ACCOUNT_CANDIDATES__', `${config.account_candidates}`)
+                        .replace('__USERS_URL__', `http://${staticServerConfig.host}:${staticServerConfig.port}/`)
+                        .replace('__STATIC_URL__', `http://${staticServerConfig.host}:${staticServerConfig.port}`)
+                        .replace('__ACCOUNTS_URL__', `http://${staticServerConfig.host}:${staticServerConfig.port}/`);
+                    server = new Cloudworker(script, { debug }).listen(port, host);
                 };
                 await startServer();
                 console.log(

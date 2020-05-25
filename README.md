@@ -21,7 +21,7 @@ A Cloudflare Worker based front-end and back-end that gives you a reversed proxy
 
 ## Setup
 
--   Install [Git](https://git-scm.com/), [Node.js with NPM](https://nodejs.org/en/download/), [Golang toolchain](https://golang.org/dl/).
+-   Install [Git](https://git-scm.com/) and [Golang toolchain](https://golang.org/dl/).
 -   Follow [AutoRclone](https://github.com/xyou365/AutoRclone) guide to create your pool of Service Accounts.
 -   I recommend adding all your Service Accounts into a Google Group to make it simple for adding all Service Accounts into a Team Drive.
 
