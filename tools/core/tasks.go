@@ -786,6 +786,9 @@ func InitGitRepo(dir string, httpsRemote string, sshRemote string) (err error) {
 }
 
 func CopyStaticFiles() (err error) {
+	if err = os.MkdirAll("static", 0700); err != nil {
+		return
+	}
 	files, err := ioutil.ReadDir("static")
 	if err != nil {
 		return
