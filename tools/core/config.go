@@ -6,14 +6,15 @@ import (
 )
 
 var Config = struct {
-	ConfigFile        string `json:"-"`
-	CloudflareEmail   string `json:"cf_email,omitempty"`
-	CloudflareKey     string `json:"cf_key,omitempty"`
-	CloudflareAccount string `json:"cf_account,omitempty"`
-	CloudflareWorker  string `json:"cf_worker,omitempty"`
-	GistToken         string `json:"gist_token,omitempty"`
-	GistUser          string `json:"gist_user,omitempty"`
-	GistID            struct {
+	ConfigFile          string `json:"-"`
+	CloudflareEmail     string `json:"cf_email,omitempty"`
+	CloudflareKey       string `json:"cf_key,omitempty"`
+	CloudflareAccount   string `json:"cf_account,omitempty"`
+	CloudflareSubdomain string `json:"-"`
+	CloudflareWorker    string `json:"cf_worker,omitempty"`
+	GistToken           string `json:"gist_token,omitempty"`
+	GistUser            string `json:"gist_user,omitempty"`
+	GistID              struct {
 		Accounts string `json:"accounts,omitempty"`
 		Users    string `json:"users,omitempty"`
 		Static   string `json:"static,omitempty"`

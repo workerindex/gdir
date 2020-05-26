@@ -1,0 +1,49 @@
+# github.com/cloudflare/cloudflare-go v0.11.6 => C:\projects\go\src\github.com\workerindex\cloudflare-go
+## explicit
+github.com/cloudflare/cloudflare-go
+# github.com/golang/protobuf v1.3.2
+github.com/golang/protobuf/proto
+# github.com/google/go-github/v31 v31.0.0
+## explicit
+github.com/google/go-github/v31/github
+# github.com/google/go-querystring v1.0.0
+github.com/google/go-querystring/query
+# github.com/pkg/errors v0.9.1
+github.com/pkg/errors
+# golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
+## explicit
+golang.org/x/crypto/cast5
+golang.org/x/crypto/openpgp
+golang.org/x/crypto/openpgp/armor
+golang.org/x/crypto/openpgp/elgamal
+golang.org/x/crypto/openpgp/errors
+golang.org/x/crypto/openpgp/packet
+golang.org/x/crypto/openpgp/s2k
+golang.org/x/crypto/ssh/terminal
+# golang.org/x/net v0.0.0-20200513185701-a91f0712d120
+golang.org/x/net/context
+golang.org/x/net/context/ctxhttp
+golang.org/x/net/idna
+# golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be
+## explicit
+golang.org/x/oauth2
+golang.org/x/oauth2/internal
+# golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+# golang.org/x/text v0.3.0
+golang.org/x/text/secure/bidirule
+golang.org/x/text/transform
+golang.org/x/text/unicode/bidi
+golang.org/x/text/unicode/norm
+# golang.org/x/time v0.0.0-20200416051211-89c76fbcd5d1
+golang.org/x/time/rate
+# google.golang.org/appengine v1.1.0
+google.golang.org/appengine/internal
+google.golang.org/appengine/internal/base
+google.golang.org/appengine/internal/datastore
+google.golang.org/appengine/internal/log
+google.golang.org/appengine/internal/remote_api
+google.golang.org/appengine/internal/urlfetch
+google.golang.org/appengine/urlfetch
+# github.com/cloudflare/cloudflare-go => C:\projects\go\src\github.com\workerindex\cloudflare-go

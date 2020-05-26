@@ -151,6 +151,35 @@ func SelectCloudflareAccount() (err error) {
 	return
 }
 
+func SetupCloudflareSubdomain() (err error) {
+	var line string
+	subdomain, err := Cf.GetSubdomain()
+	if err != nil {
+		return
+	}
+	if subdomain == "" {
+		fmt.Printf("You don't have a Cloudflare subdomain yet. It's a free service provided\n")
+		fmt.Printf("by Cloudflare to host your workers. We are going to register one for you.\n")
+		for {
+			fmt.Printf("Please enter a name for your subdomain:")
+			fmt.Scanln(&line)
+			if !regexp.MustCompile(`^\s*[a-zA-Z0-9\-_]+\s*$`).MatchString(line) {
+				fmt.Printf("Invalid subdomain format!\n")
+				continue
+			}
+			if err = Cf.RegisterSubdomain(strings.TrimSpace(line)); err != nil {
+				fmt.Printf("Cannot register this subdomain. Please try another one.\n")
+				err = nil
+				continue
+			}
+			break
+		}
+	}
+	Config.CloudflareSubdomain = subdomain
+	fmt.Printf("Your Cloudflare subdomain is: %s.workers.dev\n", subdomain)
+	return
+}
+
 func SelectWorker() (err error) {
 	if Config.CloudflareWorker != "" {
 		fmt.Println("Your selected Cloudflare Worker ID:", Config.CloudflareWorker)
@@ -715,7 +744,6 @@ func DeployGist(dir string, gistID string) (err error) {
 			return
 		}
 	}
-	fmt.Printf("Deploying %s to Gist...\n", dir)
 	cmd := exec.Command("git", "remote", "get-url", "origin")
 	cmd.Dir = dir
 	gitURL, err := cmd.Output()
@@ -741,6 +769,34 @@ func DeployGist(dir string, gistID string) (err error) {
 			}
 		}
 	}
+	cmd = exec.Command("git", "rev-list", "-n1", "--all")
+	cmd.Dir = dir
+	revList, err := cmd.Output()
+	if err != nil {
+		return
+	}
+	if Config.Debug {
+		log.Printf("Git rev-list for %s: %s", dir, string(revList))
+	}
+	orphan := regexp.MustCompile(`^\s*$`).MatchString(string(revList))
+	dirty := true
+	if !orphan {
+		var status []byte
+		cmd = exec.Command("git", "status", "--porcelain")
+		cmd.Dir = dir
+		status, err = cmd.Output()
+		if err != nil {
+			return
+		}
+		if Config.Debug {
+			log.Printf("Git status for %s: %s", dir, string(status))
+		}
+		dirty = !regexp.MustCompile(`^\s*$`).MatchString(string(status))
+	}
+	if !orphan && !dirty {
+		return
+	}
+	fmt.Printf("Deploying %s to Gist...\n", dir)
 	cmd = exec.Command("git", "add", ".")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
@@ -855,16 +911,21 @@ func DeployWorker() (err error) {
 	)
 	script := r.Replace(string(b))
 	fmt.Printf("Deploying Cloudflare Worker %s...\n", Config.CloudflareWorker)
-	_, err = Cf.UploadWorker(&cloudflare.WorkerRequestParams{
+	if _, err = Cf.UploadWorker(&cloudflare.WorkerRequestParams{
 		ScriptName: Config.CloudflareWorker,
-	}, string(script))
-	fmt.Printf("Now you can go to https://dash.cloudflare.com/%s/workers/view/%s to checkout your Worker!\n", Config.CloudflareAccount, Config.CloudflareWorker)
+	}, string(script)); err != nil {
+		return
+	}
+	if err = Cf.PublishWorker(Config.CloudflareWorker); err != nil {
+		return
+	}
+	fmt.Printf("\nYour gdir is now live at https://%s.%s.workers.dev\n", Config.CloudflareWorker, Config.CloudflareSubdomain)
 	fmt.Println("Check here to create custom routes with your own domain names:\nhttps://developers.cloudflare.com/workers/about/routes/")
 	return
 }
 
 func SaveConfigFile() (err error) {
-	b, err := json.Marshal(&Config)
+	b, err := json.MarshalIndent(&Config, "", "    ")
 	if err != nil {
 		return
 	}

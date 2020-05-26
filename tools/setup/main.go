@@ -39,6 +39,10 @@ func run() (err error) {
 		return
 	}
 
+	if err = core.SetupCloudflareSubdomain(); err != nil {
+		return
+	}
+
 	if err = core.SelectWorker(); err != nil {
 		return
 	}
