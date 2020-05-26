@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -295,6 +296,10 @@ func CreateNewGist(name string, conf *string) (err error) {
 	if err != nil {
 		return
 	}
+	if Config.Debug {
+		b, _ := json.MarshalIndent(gist, "", "    ")
+		log.Printf("Created new Gist for %s:\n", name, string(b))
+	}
 	*conf = *gist.ID
 	return SaveConfigFile()
 }
@@ -363,6 +368,9 @@ func GenerateSecretKey() (err error) {
 		return
 	}
 	Config.SecretKey = hex.EncodeToString(b)
+	if Config.Debug {
+		log.Printf("Generated secret key: %s", Config.SecretKey)
+	}
 	return SaveConfigFile()
 }
 
@@ -753,6 +761,9 @@ func InitGitRepo(dir string, httpsRemote string, sshRemote string) (err error) {
 			remote = sshRemote
 			break
 		}
+	}
+	if Config.Debug {
+		log.Printf("Initialize %s with Git URL: %s", dir, remote)
 	}
 	cmd := exec.Command("git", "init")
 	cmd.Dir = dir

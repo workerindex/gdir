@@ -25,6 +25,7 @@ var Config = struct {
 	AccountCandidatesStr string `json:"-"`
 	AccountsJSONDir      string `json:"accounts_json_dir,omitempty"`
 	AccountsCount        uint64 `json:"accounts_count,omitempty"`
+	Debug                bool   `json:"-"`
 }{}
 
 // Cf is the Cloudflare client

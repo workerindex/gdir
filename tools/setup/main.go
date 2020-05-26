@@ -128,6 +128,7 @@ func init() {
 	flag.StringVar(&core.Config.AccountRotationStr, "account-rotation", "", "number of seconds to rotate the next list of account candidates (default 60)")
 	flag.StringVar(&core.Config.AccountCandidatesStr, "account-candidates", "", "number of accounts to be selected as candidates at each rotation (default 10)")
 	flag.StringVar(&core.Config.AccountsJSONDir, "accounts-json-dir", "", "AutoRclone generated accounts directory with JSON files")
+	flag.BoolVar(&core.Config.Debug, "debug", false, "log debug messages")
 }
 
 func main() {
