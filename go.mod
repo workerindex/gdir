@@ -9,4 +9,4 @@ require (
 	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be
 )
 
-replace github.com/cloudflare/cloudflare-go => C:\projects\go\src\github.com\workerindex\cloudflare-go
+replace github.com/cloudflare/cloudflare-go => github.com/workerindex/cloudflare-go v0.11.8-0.20200526000000-4d963825dfa3
