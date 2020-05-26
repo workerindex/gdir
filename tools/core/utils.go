@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 func PromptYesNo(question string) bool {
@@ -40,6 +41,22 @@ func PromptYesNoWithDefault(question string, defaultYes bool) bool {
 			return false
 		}
 	}
+}
+
+func ParseGistID(s string) (id string, err error) {
+	s = strings.TrimSpace(s)
+	if m := regexp.MustCompile(`^\s*([0-9a-fA-F]{32})\s*$`).FindStringSubmatch(s); m != nil {
+		id = m[1]
+	} else if m := regexp.MustCompile(`^\s*git\@gist\.github\.com\:([0-9a-fA-F]{32})(\.git)?\s*$`).FindStringSubmatch(s); m != nil {
+		id = m[1]
+	} else if m := regexp.MustCompile(`\s*https?\:\/\/gist\.github\.com\/([0-9a-fA-F]{32})(\.git)?\s*$`).FindStringSubmatch(s); m != nil {
+		id = m[1]
+	} else if m := regexp.MustCompile(`^\s*https?\:\/\/gist\.github\.com\/[^\/]+\/([0-9a-fA-F]{32})\s*$`).FindStringSubmatch(s); m != nil {
+		id = m[1]
+	} else {
+		err = fmt.Errorf("unknown Gist URL/ID format: %s", s)
+	}
+	return
 }
 
 func CopyFile(src, dst string) (err error) {

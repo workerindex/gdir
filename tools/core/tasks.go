@@ -305,20 +305,11 @@ func CreateNewGist(name string, conf *string) (err error) {
 }
 
 func EnterGistID(name string, conf *string) (err error) {
-	var line string
+	var id string
 	for {
 		fmt.Printf("Please enter a Gist URL / ID for %s: ", name)
-		fmt.Scanln(&line)
-		line = strings.TrimSpace(line)
-		if m := regexp.MustCompile(`^\s*([0-9a-fA-F]{32})\s*$`).FindStringSubmatch(line); m != nil {
-			*conf = m[1]
-		} else if m := regexp.MustCompile(`^\s*git\@gist\.github\.com\:([0-9a-fA-F]{32})(\.git)?\s*$`).FindStringSubmatch(line); m != nil {
-			*conf = m[1]
-		} else if m := regexp.MustCompile(`\s*https?\:\/\/gist\.github\.com\/([0-9a-fA-F]{32})(\.git)?\s*$`).FindStringSubmatch(line); m != nil {
-			*conf = m[1]
-		} else if m := regexp.MustCompile(`^\s*https?\:\/\/gist\.github\.com\/[^\/]+\/([0-9a-fA-F]{32})\s*$`).FindStringSubmatch(line); m != nil {
-			*conf = m[1]
-		} else {
+		fmt.Scanln(&id)
+		if id, err = ParseGistID(id); err != nil {
 			continue
 		}
 		break
@@ -725,7 +716,32 @@ func DeployGist(dir string, gistID string) (err error) {
 		}
 	}
 	fmt.Printf("Deploying %s to Gist...\n", dir)
-	cmd := exec.Command("git", "add", ".")
+	cmd := exec.Command("git", "remote", "get-url", "origin")
+	cmd.Dir = dir
+	gitURL, err := cmd.Output()
+	if err != nil {
+		return
+	}
+	currentID, _ := ParseGistID(string(gitURL))
+	if currentID != gistID {
+		doSetURL := true
+		if currentID != "" {
+			fmt.Printf("Current %s directory is linked with Git: %s\n", string(gitURL))
+			if !PromptYesNoWithDefault(fmt.Sprintf("Replace it with your new Gist ID: %s?", gistID), true) {
+				doSetURL = false
+			}
+		}
+		if doSetURL {
+			if err = SetGitURL(
+				dir,
+				fmt.Sprintf("https://gist.github.com/%s.git", gistID),
+				fmt.Sprintf("git@gist.github.com:%s.git", gistID),
+			); err != nil {
+				return
+			}
+		}
+	}
+	cmd = exec.Command("git", "add", ".")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -746,6 +762,31 @@ func DeployGist(dir string, gistID string) (err error) {
 }
 
 func InitGitRepo(dir string, httpsRemote string, sshRemote string) (err error) {
+	cmd := exec.Command("git", "init")
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err = cmd.Run(); err != nil {
+		return
+	}
+	cmd = exec.Command("git", "config", "user.name", "gdir")
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err = cmd.Run(); err != nil {
+		return
+	}
+	cmd = exec.Command("git", "config", "user.email", "gdir@google.com")
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err = cmd.Run(); err != nil {
+		return
+	}
+	return SetGitURL(dir, httpsRemote, sshRemote)
+}
+
+func SetGitURL(dir, httpsRemote string, sshRemote string) (err error) {
 	var remote string
 	fmt.Printf("Specify which protocol you want to configure your %s Git repo:\n", dir)
 	fmt.Println("    (1) HTTPS                                  (default)")
@@ -765,28 +806,10 @@ func InitGitRepo(dir string, httpsRemote string, sshRemote string) (err error) {
 	if Config.Debug {
 		log.Printf("Initialize %s with Git URL: %s", dir, remote)
 	}
-	cmd := exec.Command("git", "init")
+	cmd := exec.Command("git", "remote", "remove", "origin")
 	cmd.Dir = dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err = cmd.Run(); err != nil {
-		return
-	}
+	cmd.Run() // ignore non-zero code, if origin doesn't exist
 	cmd = exec.Command("git", "remote", "add", "origin", remote)
-	cmd.Dir = dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err = cmd.Run(); err != nil {
-		return
-	}
-	cmd = exec.Command("git", "config", "user.name", "gdir")
-	cmd.Dir = dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err = cmd.Run(); err != nil {
-		return
-	}
-	cmd = exec.Command("git", "config", "user.email", "gdir@google.com")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
