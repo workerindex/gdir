@@ -143,7 +143,7 @@ export async function handleRequest(request: Request): Promise<Response> {
         }
 
         {
-            const pathname = url.pathname === '/' || url.pathname.startsWith('/folder/') ? '/index.html' : url.pathname;
+            const pathname = url.pathname === '/' || url.pathname.startsWith('/folder/') || url.pathname === '/search' ? '/index.html' : url.pathname;
             const response = await fetch(await config.static(pathname));
 
             const headers = new Headers(response.headers);

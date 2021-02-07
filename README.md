@@ -39,10 +39,6 @@ go run ./tools/setup
 
 Then follow the instructions to setup and deploy your gdir instance.
 
-**NOTE:** Linux users should use a non-root user to setup gdir. As root may fail in some Linux systems during `npm install`.
-
-**Note:** Windows users may or may not experience with random failures during `npm install`. Typically with failure messages like `Error: PERM: operation not permitted`. This is usually your antivirus is reading some files while npm is trying to remove them. Try turning off your antivirus, remove the `node_modules` folder and try again.
-
 ## Add / Edit Users
 
 To add more users, run the following command:

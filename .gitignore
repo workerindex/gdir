@@ -1,6 +1,8 @@
 node_modules
 .vscode
+.idea
 /config*.json
 /accounts
 /users
 /static
+/build

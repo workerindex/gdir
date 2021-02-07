@@ -6,7 +6,8 @@
         "target": "esnext",
         "module": "esnext",
         "importHelpers": true,
-        "lib": ["esnext", "webworker"]
+        "lib": ["esnext", "webworker"],
+        "types": ["@cloudflare/workers-types"]
     },
     "include": ["*.ts", "**/*.ts", "../node_modules/@cloudflare/workers-types/index.d.ts"],
     "exclude": ["../node_modules/", "../dist/", "../app/"]

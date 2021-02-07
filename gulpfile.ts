@@ -41,7 +41,7 @@ gulp.task('app.rollup', async () => {
         output: {
             file: './dist/static/app.js',
             format: 'iife',
-            sourcemap: true,
+            sourcemap: 'inline',
             globals: {
                 react: 'React',
                 'react-dom': 'ReactDOM',
@@ -91,7 +91,7 @@ gulp.task('worker.rollup', async () => {
 gulp.task('worker.config', async () => {});
 
 gulp.task('clean', async () =>
-    Promise.all([rmfr('./dist/*.*', { glob: {} }), rmfr('./dist/static/*.*', { glob: {} })]),
+    Promise.all([rmfr('./dist/worker.js', { glob: {} }), rmfr('./dist/static/*.*', { glob: {} })]),
 );
 
 gulp.task('dist', series('clean', 'app.rollup', 'app.scss', 'app.static', 'worker.rollup'));
