@@ -31,7 +31,7 @@
         "lodash.template": ">=4.5.0",
         "node-sass": "^5.0.0",
         "open": "^7.4.0",
-        "qs": "^6.9.6",
+        "qs": "^6.9.7",
         "react-router-dom": "^5.2.0",
         "rmfr": "^2.0.0",
         "rollup": "^2.38.5",
